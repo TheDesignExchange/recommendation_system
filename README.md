@@ -1,3 +1,4 @@
-# recommendation_system
+# Recommendation System
 
-The recommendation system, built for the Design Exchange
+A recommendation system built to enable machine learning-based design method suggestions to users of the Design Exchange website.
+
