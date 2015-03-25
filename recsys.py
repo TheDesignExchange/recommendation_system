@@ -63,7 +63,23 @@ CASE_ATTRIB_DICT = {"development_cycle":2,
 # Note also that, in current database, boolean attribute values are "f" or "t"
 
 
-## GET DATA VIA DIRECT DATABASE PULL ##
+# API
+ROOT_API_URL = "https://thedesignexchange.herokuapp.com/"       # root API url for Design Exchange web app
+API_ALL_METHOD_TBL_EXT = "design_methods"                           # all design methods extension
+API_ALL_METHOD_TBL_BY_ID_EXT = "design_methods/id"                  # design methods by ID extension
+API_ALL_CASE_TBL_EXT = "case_studies"                               # all case studies extension
+API_ALL_CASE_TBL_BY_ID_EXT = "case_studies/id"                      # case studies by ID extension
+API_C2M_TBL_EXT = "method_case_studies"                             # methods/case studies (one-to-many tbl) extension
+API_ALL_CASE_FLD = "title"
+API_ALL_METHOD_FLD = "name"
+API_C2M_CASE_FLD = "case_study_id"
+API_C2M_METHOD_FLD = "design_method_id"
+
+
+
+## GET DATA VIA LOCAL DATABASE PULL ##
+
+# Using hard-coded db filepaths defined above
 
 def get_all_cases_and_methods_data(db, case_tbl, case_name_fld, method_tbl, method_name_fld, id_fld="id"):
     ''' 
@@ -98,9 +114,9 @@ def get_cases_to_methods_data(db, tbl, case_fld, method_fld):
     ''' 
     input:  str, full path to target sqlite database (db)
             str, name of target database table (method-case study relation) (tbl)
-            str, name of field with cases in target db (case_fld)
-            str, name of field with methods in target db (method_fld)
-    output: data in cases and methods fields in db, as array
+            str, name of field with cases in target table (case_fld)
+            str, name of field with methods in target table (method_fld)
+    output: data in cases and methods fields in table, as array
 
     NOTE:   consider consolidating this function with get_all_cases_and_methods_data() above, in one get_data function
             OR both with create_interaction_matrix() function, in one big create_interaction_matrix function (which gets data and creates matrix)
@@ -123,20 +139,38 @@ def get_cases_to_methods_data(db, tbl, case_fld, method_fld):
 
 
 
-
-
-## GET DATA VIA API CALL ##
+## GET DATA VIA API PULL ##
 
 # Using 'requests' module
 # see http://docs.python-requests.org/en/latest/user/quickstart/
 
+# From Design Exchange Wiki
+
+# either send a get request with Accept: application/json header or send a get request to /path/file.json
+# all design methods: /design_methods
+# design methods by ID: /design_methods/id
+# all case studies: GET /case_studies
+# case studies by ID: /case_studies/id
+# Method case studies: /method_case_studies
+
 # TEST - DELETE
 def api_test():
     r = requests.get('https://api.github.com/events')
-    print r    
+    r_json = r.json()
+
+    print "type(r_json)"
+    print type(r_json)
+    print "r_json"
+    print r_json[:2]
+    
+##    r_json_py = json.loads(str(r_json))
+##    print "type(r_json_py)"
+##    print type(r_json_py)
+##    print "r_json_py"
+##    print r_json_py[:2]
             
 
-def get_all_data_api(arg1, arg2):
+def get_all_data_via_api(url, case_tbl_ext, case_tbl_name_fld, method_tbl_ext, method_tbl_name_fld, c2m_tbl_ext, c2m_case_fld, c2m_method_fld, id_fld="id"):
 
     ''' 
     input:  str, root DesEx url (...)
@@ -158,21 +192,35 @@ def get_all_data_api(arg1, arg2):
 
     '''
 
-    # Design Exchange data url
-    DesEx_url = "http://thedesignexchange.berkeley.edu/api/....."   #<---CHANGE! (may need one for each table)
-    # ... (or can include table names among function args, and concatenate to create each table-specific url)
+    # Construct request urls
+    case_tbl_url = url + case_tbl_ext
+    print "case_tbl_url"
+    print case_tbl_url
 
-    # Get data at url (possibly one for each)
-    data = requests.get(DexEx_url)
+    method_tbl_url = url + method_tbl_ext
+    print "method_tbl_url"
+    print method_tbl_url
 
-    # Get json representation of data object (possibly one for each)
-    data_json = data.json()
+    c2m_tbl_url = url + c2m_tbl_ext    
+    print "c2m_tbl_url"
+    print c2m_tbl_url 
 
-    # Convert json to python object (possibly one for each)
-    data_json_py = json.loads(data_json)
+    # Get/process data at each request url
+    # case table
+    data = requests.get(case_tbl_url)       # Get data object via api call
+    print "data"
+    print data
+    data_json = data.json()                 # Get json representation of data object
+    #data_json_py = json.loads(data_json)    # Convert json to python object
+                                            # Convert python object to array
 
-    # Convert python object to array (possibly one for each)
-    
+    # TEST
+    print "Type(data): "
+    print type(data)
+    print "dat_json type:"
+    print type(data_json)
+    print "data_json contents:"
+    print data_json
     
 
 
@@ -483,11 +531,10 @@ if __name__ == "__main__":
     #<--- LEFT OFF HERE 2/6 -- CHECK THAT ALL ATTRIBS AND METHODS ARE CORRECTLY REP'D IN BIG ARRAY!!  (once full database is avail)
 
     #TEST - API DATA PULL
-    api_test()
+    #api_test()
+    get_all_data_via_api(ROOT_API_URL, API_ALL_CASE_TBL_EXT, API_ALL_CASE_FLD, API_ALL_METHOD_TBL_EXT, API_ALL_METHOD_FLD, API_C2M_TBL_EXT, API_C2M_CASE_FLD, API_C2M_METHOD_FLD)
 
-
-    #np.set_printoptions(threshold='nan')
-    
+  
 
 
     
