@@ -3,7 +3,6 @@
 ##
 ## Created by:  Adam Spitzig
 ## Created on:  Nov 24, 2014
-## Updated on:  Mar 10, 2015
 
 # Dependencies:
 # numpy, scipy, nimfa, matplotlib, mpltools, sparsesvd, requests
@@ -32,22 +31,37 @@ import sqlite3 as lite
 import requests
 import json
 
+
+# LOCAL DB INFO
+
 # SQLite database path
 SQLITE_DB = r"/home/aspitzig/Desktop/DesEx/design_exchange_development.sqlite3"
 
-# All cases and all methods data (from master lists [in resp db tables] of cases and methods)
-ALL_METHOD_TBL = "design_methods"
-ALL_METHOD_FLD = "name"
-ALL_CASE_TBL = "case_studies"
-ALL_CASE_FLD = "title"
-#NOTE: Presumption is that the ID field of all is "id" - hard-coded as default in function args below
+# Cases, methods and cases-to-methods table names and field names
+##ALL_METHOD_TBL = "design_methods"
+##ALL_METHOD_FLD = "name"
+##ALL_CASE_TBL = "case_studies"
+##ALL_CASE_FLD = "title"
+ALL_ID_FLD = "id"                        # for both all_case_tbl and all_method_tbl (code presums same field name in both)
+##C2M_DB_TBL = "method_case_studies"
+##C2M_CASE_FLD = "case_study_id"
+##C2M_METHOD_FLD = "design_method_id"
 
-# Cases to methods data (from cases-to-methods db table, indicating which methods were used by which cases)
-C2M_DB_TBL = "method_case_studies"
-C2M_CASE_FLD = "case_study_id"
-C2M_METHOD_FLD = "design_method_id"
 
-# All case attribute data (from master list of cases - i.e. "case_studies" table)
+# API INFO
+ROOT_API_URL = "https://thedesignexchange.herokuapp.com/"           # root API url for Design Exchange web app
+API_ALL_METHOD_TBL_EXT = "design_methods"                           # all design methods extension
+API_ALL_METHOD_TBL_BY_ID_EXT = "design_methods/id"                  # design methods by ID extension
+API_ALL_CASE_TBL_EXT = "case_studies"                               # all case studies extension
+API_ALL_CASE_TBL_BY_ID_EXT = "case_studies/id"                      # case studies by ID extension
+API_C2M_TBL_EXT = "method_case_studies"                             # methods/case studies (one-to-many tbl) extension
+API_ALL_CASE_FLD = "name"
+API_ALL_METHOD_FLD = "name"
+API_C2M_CASE_FLD = "case_study_id"
+API_C2M_METHOD_FLD = "design_method_id"
+
+
+# CASE ATTRIBUTE INFO (from "case_studies" table)
 CASE_ATTRIB_DICT = {"development_cycle":2,
                     "design_phase":2,
                     "project_domain":4,
@@ -57,28 +71,14 @@ CASE_ATTRIB_DICT = {"development_cycle":2,
                     "social_setting":2,
                     "customerIsUser":"boolean",
                     "remoteProject":"boolean"}
-
 # Dict structure: KEY -> attribute field name (string) | VALUE-> max category value (int) OR indication that attrib is boolean (string)
 # Note that max category values represents highest of INCLUSIVE range - i.e. 3 means range (0, 3) inclusive [0, 1, 2 or 3]
-# Note also that, in current database, boolean attribute values are "f" or "t"
+# Note also that, in local database, boolean attribute values are "f" or "t"
+
+# Note that "attributes" here refers to combination of case "characteristics" and "details" (terminology on website)
 
 
-# API
-ROOT_API_URL = "https://thedesignexchange.herokuapp.com/"       # root API url for Design Exchange web app
-API_ALL_METHOD_TBL_EXT = "design_methods"                           # all design methods extension
-API_ALL_METHOD_TBL_BY_ID_EXT = "design_methods/id"                  # design methods by ID extension
-API_ALL_CASE_TBL_EXT = "case_studies"                               # all case studies extension
-API_ALL_CASE_TBL_BY_ID_EXT = "case_studies/id"                      # case studies by ID extension
-API_C2M_TBL_EXT = "method_case_studies"                             # methods/case studies (one-to-many tbl) extension
-API_ALL_CASE_FLD = "title"
-API_ALL_METHOD_FLD = "name"
-API_C2M_CASE_FLD = "case_study_id"
-API_C2M_METHOD_FLD = "design_method_id"
-
-
-
-## GET DATA VIA LOCAL DATABASE PULL ##
-
+# GET DATA FROM LOCAL DATABASE
 # Using hard-coded db filepaths defined above
 
 def get_all_cases_and_methods_data(db, case_tbl, case_name_fld, method_tbl, method_name_fld, id_fld="id"):
@@ -139,133 +139,148 @@ def get_cases_to_methods_data(db, tbl, case_fld, method_fld):
 
 
 
-## GET DATA VIA API PULL ##
+# GET DATA VIA API
+# Using hard-coded API info above
 
-# Using 'requests' module
-# see http://docs.python-requests.org/en/latest/user/quickstart/
-
-# From Design Exchange Wiki
-
-# either send a get request with Accept: application/json header or send a get request to /path/file.json
-# all design methods: /design_methods
-# design methods by ID: /design_methods/id
-# all case studies: GET /case_studies
-# case studies by ID: /case_studies/id
-# Method case studies: /method_case_studies
-
-# TEST - DELETE
-def api_test():
-    r = requests.get('https://api.github.com/events')
-    r_json = r.json()
-
-    print "type(r_json)"
-    print type(r_json)
-    print "r_json"
-    print r_json[:2]
-    
-##    r_json_py = json.loads(str(r_json))
-##    print "type(r_json_py)"
-##    print type(r_json_py)
-##    print "r_json_py"
-##    print r_json_py[:2]
-            
-
-def get_all_data_via_api(url, case_tbl_ext, case_tbl_name_fld, method_tbl_ext, method_tbl_name_fld, c2m_tbl_ext, c2m_case_fld, c2m_method_fld, id_fld="id"):
+def get_all_data_via_api(url, case_tbl_ext, case_tbl_name_fld, method_tbl_ext, method_tbl_name_fld, c2m_tbl_ext, c2m_case_fld, c2m_method_fld, id_fld):
 
     ''' 
-    input:  str, root DesEx url (...)
-            ... 
-            (str, name of target database table (method-case study relation) (tbl))
-            (str, name of field with cases in target db (case_fld))
-            (str, name of field with methods in target db (method_fld))
-            ...
+    input:  str, root DesEx url (url)
+            str, case table extension (name of case table, to append to root url) (case_tbl_ext)
+            str, name of field with case names (case_tbl_name_fld)
+            str, method table extension (name of method table, to append to root url) (method_tbl_ext)
+            str, name of field with method names (method_tbl_name_fld)
+            str, case-to-method table extension (name of case-to-method table, to append to root url) (c2m_tbl_ext)
+            str, name of field with case ids in c-to-m table (c2m_case_fld)
+            str, name of field with method ids in c-to-m table (c2m_method_fld)
     output: three arrays:
                 (1) all methods, w/ two cols: id, name
                 (2) all cases, w/ two cols: id, name
                 (3) case-to-methods, w/ two cols: case_id, method_id
 
     dependencies: requests, json
-
-    NOTE: If it is necessary to pass in parameters to API call - that is, include params in url, use as template:
-        payload = {'key1': 'value1', 'key2': 'value2'}
-        r = requests.get("http://httpbin.org/get", params=payload)
-
     '''
-
+    
     # Construct request urls
-    case_tbl_url = url + case_tbl_ext
-    print "case_tbl_url"
-    print case_tbl_url
-
-    method_tbl_url = url + method_tbl_ext
-    print "method_tbl_url"
-    print method_tbl_url
-
-    c2m_tbl_url = url + c2m_tbl_ext    
-    print "c2m_tbl_url"
-    print c2m_tbl_url 
-
-    # Get/process data at each request url
-    # case table
-    data = requests.get(case_tbl_url)       # Get data object via api call
-    print "data"
-    print data
-    data_json = data.json()                 # Get json representation of data object
-    #data_json_py = json.loads(data_json)    # Convert json to python object
-                                            # Convert python object to array
+    case_tbl_url = url + case_tbl_ext + ".json"
+    method_tbl_url = url + method_tbl_ext + ".json"
+    c2m_tbl_url = url + c2m_tbl_ext + ".json"
 
     # TEST
-    print "Type(data): "
-    print type(data)
-    print "dat_json type:"
-    print type(data_json)
-    print "data_json contents:"
-    print data_json
+    #print "case_tbl_url"
+    #print case_tbl_url
+    #print "method_tbl_url"
+    #print method_tbl_url
+    #print "c2m_tbl_url"
+    #print c2m_tbl_url
+    #print
+    #print "getting data via API..."
+
+    # Get data via urls (as pandas dfs)
+    case_tbl_data = pd.io.json.read_json(case_tbl_url)
+    method_tbl_data = pd.io.json.read_json(method_tbl_url)
+    c2m_tbl_data = pd.io.json.read_json(c2m_tbl_url)
+
+    # Construct column lists (i.e columns to keep for output arrays)
+    case_cols = [id_fld, case_tbl_name_fld]
+    method_cols = [id_fld, method_tbl_name_fld]
+    c2m_cols = [c2m_case_fld, c2m_method_fld]
+
+    # TEST
+    #print case_cols
+    #print method_cols
+    #print c2m_cols
+    #print case_tbl_data
+
+    # Sort pandas dfs (using column lists from above as: [sort by this col first, sort by this col second])
+    case_tbl_data_sort = case_tbl_data.sort(columns=[case_cols[0]])
+    method_tbl_data_sort = method_tbl_data.sort(columns=[method_cols[0]])
+    c2m_tbl_data_sort = c2m_tbl_data.sort(columns=[c2m_cols[0]])
+
+    # Convert pandas dfs to numpy arrays, removing all but columns to keep   
+    case_tbl_final = case_tbl_data_sort.as_matrix(columns = case_cols)
+    method_tbl_final = method_tbl_data_sort.as_matrix(columns = method_cols)
+    c2m_tbl_final = c2m_tbl_data_sort.as_matrix(columns = c2m_cols)
+
+    # TEST
+    #print "case_tbl_data_sort_clean"
+    #print case_tbl_data_sort_clean
+    #print "case_tbl_data"
+    #print case_tbl_data
     
+    #print "method_tbl_data_sort_clean[:5,]"
+    #print method_tbl_data_sort_clean[:5,]
+    #print "method_tbl_data"
+    #print method_tbl_data
+    
+    #print "c2m_tbl_data_sort_clean[:5,]"
+    #print c2m_tbl_data_sort_clean[:5,]
+    #print "c2m_tbl_data"
+    #print "TYPE"
+    #print type(c2m_tbl_data)
+    #print c2m_tbl_data
 
 
-            
+    return case_tbl_final, method_tbl_final, c2m_tbl_final
 
 
-
-
-
-def create_interaction_matrix(all_cases, all_methods, cases_to_methods):
+def create_interaction_matrix(all_cases, all_methods, cases_to_methods, id_fld):
     '''
-    input:  array, all data in cases table (id and name) (product 1 of get_all_cases_and_methods_data() function) (all_cases)
-            array, all data in methods table (id and name) (product 2 of get_all_cases_and_methods_data() function) (all_methods)
-            array, data in cases-to-methods relatioship table (product of get_cases_to_methods() function) (cases_to_methods)
+    input:  array, all data in cases table (id and name) (product 1 of get_all_data_via_api() function
+                and also get_all_cases_and_methods_data() function) (all_cases)
+            array, all data in methods table (id and name) (product 2 of get_all_data_via_api() function
+                and also get_all_cases_and_methods_data() function) (all_methods)
+            array, data in cases-to-methods relatioship table (product 3 of get_all_data_via_api() function
+                and also sole product of get_cases_to_methods() function) (cases_to_methods)
     output: array, matrix representing the interaction of cases and methods (binary interaction matrix)
 
-    NOTE:   function presumes that cases and methods have ids in non-broken, ordered sequence
+    note: all_cases and all_methods arrays must be ordered by id (ascending) and first column of both must be id field
     '''
+
+    # create list of all case and method ids (as integers)
+    case_ids = list(all_cases[:,0]) 
+    case_ids = map(int, case_ids)
+    method_ids = list(all_methods[:,0])
+    method_ids = map(int, method_ids)
 
     # Create empty matrix (all zeros) of size cases*methods
     cases_len = len(all_cases)
     methods_len = len(all_methods)    
     cases_methods_matrix = np.zeros((cases_len, methods_len))
+    cases_methods_matrix_alt = np.zeros((cases_len, methods_len))
 
     # Fill matrix (with "1"s) according to cases_to_methods relationship table
     for case_id, method_id in cases_to_methods:
+        # TEST
         print "Case id: " + str(case_id) + "  Method id: " + str(method_id)
-        cases_methods_matrix[int(case_id)-1][int(method_id)-1] = 1
 
-    # OJO! -> matrix row numbers correspond to (case_id - 1) and column numbers to (method_id - 1) 
+        # original construction of matrix, reliant on unbroken id sequence (works for unbroken/ordered id seq inputs)
+        #cases_methods_matrix[int(case_id)-1][int(method_id)-1] = 1
+        # note: all matrix row numbers correspond to (case_id - 1) and column numbers to (method_id - 1) 
 
-    return cases_methods_matrix  
+        # alternative construction, unreliant on unbroken id sequence (appears to work, after initial checks)
+        case_id_index = case_ids.index(case_id)
+        method_id_index = method_ids.index(method_id)
+        cases_methods_matrix_alt[case_id_index][method_id_index] = 1
+
+    # TEST
+    #print "MATRICES EQUIVALENT: "
+    #print np.array_equal(cases_methods_matrix, cases_methods_matrix_alt)    
+
+    return cases_methods_matrix_alt  
     
 def case_to_case_collab_filter(int_matrix, k=3, thresh=0.5):
     '''
     input:  array, interaction matrix (int_matrix)
             int, number of nearest neighbors - i.e. number of 'closest' cases to be used to determine prediced values (k) 
-            float, cutoff probability north of which a method is considered to be probable/recommendable - i.e. marked as '1' in output
+            float, cutoff probability above which a method is considered to be probable/recommendable - i.e. marked as '1' in output
     output: array, binary matrix w/ predicted values (0 or 1)   
 
-    NOTE:   THIS CALCULATES JACC DISTANCE FOR ALL ROWS IN int_matrix -> POSSIBLE OVERKILL. For DesEx only need to calc distances between
-            user-entered case (profile as vector, i.e. single row) and all other cases, and make predictions/recommendations for
+    NOTE:   THIS CALCULATES JACCARD DISTANCE FOR ALL ROWS IN int_matrix -> POSSIBLE OVERKILL. For DesEx only need to calc distances between
+            user-entered case (profile as vector, i.e. single row) and all other cases, and make predictions/recommendations for the single
             input case. Considering modifying in refinement stage.
             
-            In refinement stage, consider optimizing k and thresh values (using cross-validation(-like) approach)
+            Also in refinement stage, consider optimizing k and thresh values (using cross-validation, or similar, approach)
     '''
     #create distance matrix
     dist_matrix = dist.squareform(dist.pdist(int_matrix, 'jaccard'))
@@ -286,12 +301,12 @@ def method_to_method_collab_filter(int_matrix, k=3, thresh=0.5):
     '''
     input:  array, interaction matrix (int_matrix)
             int, number of nearest neighbors - i.e. number of 'closest' methods to be used to determine prediced values (k) 
-            float, cutoff probability north of which a case is considered to be probable/recommendable - i.e. marked as '1' in output (thresh)
+            float, cutoff probability above which a case is considered to be probable/recommendable - i.e. marked as '1' in output (thresh)
     output: array, binary matrix w/ predicted values (0 or 1) 
 
-    NOTE:   In refinement stage, consider optimizing k and thresh values (using cross-validation(-like) approach)
+    NOTE:   In refinement stage, consider optimizing k and thresh values (using cross-validation, or similar, approach)
 
-            Resources indicate that item-to-item (here, method-to-method) collab filtering - this function - often works best
+            Some resources indicate that item-to-item (here, method-to-method) collab filtering - this function - may work best
     '''
     #transpose int_matrix (rows are now methods)
     int_matrix_T = int_matrix.T
@@ -324,7 +339,9 @@ def case_attrib_data_to_binary_array(db, case_tbl, attrib_dict):
 
     Function retrieves case attribute data from database, and converts it to binary matrix, with all attribs as 1/0 dummy vars
     Output ready for use as X-matrix in PLS regression (if using)
-    Output also ready for appending interaction matrix, anc reating big array ready for use in collab filters (if bypassing PLS regression)
+    Output also ready for appending interaction matrix, and creating big array ready for use in collab filters (if bypassing PLS regression)
+
+    NOTE: for API purposes, consider inserting this function into the single get_data_via_api function, and including bin matrix as another output
     '''
     import pandas as pd   #pandas used here b/c it more easily allows for conversion to dummy (binary) variables for all attribute cols
 
@@ -345,12 +362,11 @@ def case_attrib_data_to_binary_array(db, case_tbl, attrib_dict):
     SQL = "SELECT " + fld_str + " FROM " + case_tbl
     df = pd.read_sql(SQL, con)
 
-    print df
+    # print df #TEST
 
-    # Consider using the function below to clean the dataset (IF DOING THIS, AND ROWS ARE REMOVED, MUST ENSURE THAT NUMPY ARRAYS MATCH ORDER)
-    # (OR, EVEN BETTER FOR MATCHING PURPOSES, DROP ONLY COLUMNS THAT HAVE NaN VALUES - change axis to 1)
-    # Currently this function is UNUSED
-    # BEST CASE and CURRENT WORKING ASSUMPTION is that all rows (cases) in database have all attributes filled out
+    # Consider using the function below to clean the dataset
+    # Currently this function is unused and unfinished
+    # Best and CURRENT WORKING ASSUMPTION is that all rows (cases) in database have all attributes filled out
     def clean_df(df, min_non_NAs):
         '''
         input: pandas dataframe (df), minimum number of non-NaN values needed to keep a row (otherwise it is deleted) (int)
@@ -361,7 +377,7 @@ def case_attrib_data_to_binary_array(db, case_tbl, attrib_dict):
         '''
         return df.dropna(axis=0, thresh=min_non_NAs)
 
-    # add new indicator field for all polytomous vars
+    # add new indicator field for all polytomous variables
     for fld in dummy_fld_list:
         for elem in df[fld].unique():
             df[str(fld) + "_" + str(elem)] = df[fld] == elem
@@ -372,9 +388,9 @@ def case_attrib_data_to_binary_array(db, case_tbl, attrib_dict):
 
     ## NOTE! Here, may want to delete newly-added indicator fields that end in "nan" too (b/c original polytomous var field had NaN values) ##
     ##  The comparison above appears not to work with "NaN" in any case, rendering all cells under "nan"-ending cols False
-    ## (another reason to allow ONLY cases with ALL attributes filled out in RecSys)
+    ## (another reason to allow ONLY cases with all attributes filled out into the RecSys)
 
-    # NOTE new indicator fields are truly boolean, while fields in bool_fld_list form original table are "t" and "f". Therefore...
+    # NOTE new indicator fields are truly boolean, while fields in bool_fld_list from original table are "t" and "f". Therefore...
     # ...change original bool_fld_lst fields from "t"/"f" to True/False
     def all_to_Bool(x):
         if type(x) == unicode:
@@ -431,7 +447,9 @@ def create_all_case_attribs_and_methods_binary_array(case_attrib_bin_matrix, int
 def PLS_regression(matrix_X, matrix_Y):
     '''
     input:  binary arrays, case attributes (matrix_X) and corresponding methods (matrix_Y)
-    output: (binary vector, representing method predictions for 
+    output: (binary vector, representing method predictions for
+
+    Note: this function is currently unused/unfinished; PLS deprioritized in favor of collaborative filtering
     '''
     components = matrix_X.shape[1] # number of columns (predictor variable/features) in matrix X
     # NOTE: unsure how many components to use...RESEARCH (number of features - i.e. cols in X? number of dep. vars. - i.e. cols in Y?)
@@ -452,12 +470,16 @@ def PLS_regression(matrix_X, matrix_Y):
     
 
 
-## Taking and processing in user input from website
+## Taking and processing user input from website
 
 def user_input_to_binary_vector(user_input):
     '''
     PLACEHOLDER - takes data input by users through RecSys UI on DesEx website (case attributes) and converts to binary vector
-    (i.e. row to add to matrix_X, for use in PLS Regression)
+    (i.e. a single row, which will be added to the end of the binary array created by case_attrib_data_to_binary_array(), via the function
+    add_row_to_binary_matrix()....this matrix will, in turn, be...
+        - added to the methods array, via create_all_case_attribs_and_methods_binary_array(), for collaborative filtering
+        - or ready to act as matrix_X, for use in PLS Regression, if using
+    
     Working assumption: this data will enter via JSON, as array
     '''
     raise NotImplementedError()
@@ -468,102 +490,121 @@ def add_row_to_binary_matrix(row, matrix):
     output: operational, adds vector to end of matrix (as last row)
 
     Tacks on binary vector of user's input (product of function user_input_to_binary_vector())
-    to the end/bottom of the binary vector with all case attribute and method data (product of create_all_case_attribs_and_methods_binary_array())
     '''
     return matrix.append(vector)  # TEST confirm this works
     
 
 if __name__ == "__main__":
 
-    # TEST DATA
-    X = np.array([[1,0,0,2,1,4,6,0,5,2],
-             [4,0,5,2,1,4,6,0,5,1],
-             [0,0,0,2,1,4,6,1,4,0],
-             [3,0,0,2,1,4,6,0,5,0],
-             [3,0,0,2,1,4,6,0,5,0],
-             [0,3,3,4,4,4,4,5,6,2],
-             [3,0,0,2,1,4,6,0,5,0],
-             [3,6,0,0,0,0,0,0,5,2],])
-    Xb = X.clip(0,1) #clip ound everything above 1 to 1
-    Xb_split = np.hsplit(Xb, [7])    
-    Xb_X, Xb_Y = Xb_split[0], Xb_split[1]
+##    # TEST DATA
+##    X = np.array([[1,0,0,2,1,4,6,0,5,2],
+##             [4,0,5,2,1,4,6,0,5,1],
+##             [0,0,0,2,1,4,6,1,4,0],
+##             [3,0,0,2,1,4,6,0,5,0],
+##             [3,0,0,2,1,4,6,0,5,0],
+##             [0,3,3,4,4,4,4,5,6,2],
+##             [3,0,0,2,1,4,6,0,5,0],
+##             [3,6,0,0,0,0,0,0,5,2],])
+##    Xb = X.clip(0,1) #clip ound everything above 1 to 1
+##    Xb_split = np.hsplit(Xb, [7])    
+##    Xb_X, Xb_Y = Xb_split[0], Xb_split[1]
+##
+##    # Get data from master lists of cases and methods (ids and names for all cases and methods)
+##    all_cases, all_methods = get_all_cases_and_methods_data(SQLITE_DB, ALL_CASE_TBL, ALL_CASE_FLD, ALL_METHOD_TBL, ALL_METHOD_FLD)
+##    print "ALL CASES ______________________________"
+##    print all_cases
+##    print
+##    print "ALL METHODS _____________________________"
+##    print all_methods
+##
+##    # Get data from cases-methods relationship table (indicating which cases used which methods)
+##    cases_to_methods_data = get_cases_to_methods_data(SQLITE_DB, C2M_DB_TBL, C2M_CASE_FLD, C2M_METHOD_FLD)
+##    print "CASES TO METHODS _______________________________"
+##    print cases_to_methods_data
+##
+##    # Create interaction matrix (capturing cases-methods relationship table in binary matrix)(for subsequent us in collaborative filtering)
+##    int_matrix = create_interaction_matrix(all_cases, all_methods, cases_to_methods_data, ALL_ID_FLD)
+##
+##    # Create predictions using case-to-case collaborative filter
+##    case_to_case_collab_filter_predictions = case_to_case_collab_filter(int_matrix)
+##    print "Case-to-case collaborative filtering"
+##    print case_to_case_collab_filter_predictions
+##
+##    # Create predictions using method-to-method collaborative filter
+##    method_to_method_collab_filter_predictions = method_to_method_collab_filter(int_matrix)
+##    print "Method-to-method collaborative filtering"
+##    print method_to_method_collab_filter_predictions
+##
+##    #PLS TEST
+##    #PLS_regression(Xb_X, Xb_Y)
+##
+##    # Create array with all case attribte data in binary format (as dummy variables)
+##    case_attrib_bin_array = case_attrib_data_to_binary_array(SQLITE_DB, ALL_CASE_TBL, CASE_ATTRIB_DICT)
+##
+##    #TEST - COMPARE CASE ATTRIB BIN ARRAY AND INT MATRIX - make sure they align (for merging in function)
+##    print case_attrib_bin_array.shape
+##    print int_matrix.shape
+##
+##    #TEST MERGING FUNCTION OUTPUT
+##    big_array = create_all_case_attribs_and_methods_binary_array(case_attrib_bin_array, int_matrix)
+##    print "Big array: "
+##    print big_array.shape
+##    print big_array[:10,:20]
+##    big_array_first_two_rows = big_array[:2,]  # get first two rows of big array only
+##    big_array_first_two_rows_T = big_array_first_two_rows.T # flip vertically for easier viewing in output
+##    print big_array_first_two_rows_T # CHECK THAT ALL ATTRIBS AND METHODS ARE CORRECTLY REP'D IN BIG ARRAY
+##
+##    #<--- LEFT OFF HERE 2/6 -- CHECK THAT ALL ATTRIBS AND METHODS ARE CORRECTLY REP'D IN BIG ARRAY!!  (once full database is avail)
 
-    # Get data from master lists of cases and methods (ids and names for all cases and methods)
-    all_cases, all_methods = get_all_cases_and_methods_data(SQLITE_DB, ALL_CASE_TBL, ALL_CASE_FLD, ALL_METHOD_TBL, ALL_METHOD_FLD)
-
-    # Get data from cases-methods relationship table (indicating which cases used which methods)
-    cases_to_methods_data = get_cases_to_methods_data(SQLITE_DB, C2M_DB_TBL, C2M_CASE_FLD, C2M_METHOD_FLD)
-    print "CASES TO METHODS _______________________________"
-    print cases_to_methods_data
-
-    # Create interaction matrix (capturing cases-methods relationship table in binary matrix)(for subsequent us in collaborative filtering)
-    int_matrix = create_interaction_matrix(all_cases, all_methods, cases_to_methods_data)
-
-    # Create predictions using case-to-case collaborative filter
-    case_to_case_collab_filter_predictions = case_to_case_collab_filter(int_matrix)
-    print "Case-to-case collaborative filtering"
-    print case_to_case_collab_filter_predictions
-
-    # Create predictions using method-to-method collaborative filter
-    method_to_method_collab_filter_predictions = method_to_method_collab_filter(int_matrix)
-    print "Method-to-method collaborative filtering"
-    print method_to_method_collab_filter_predictions
-
-    #PLS TEST
-    #PLS_regression(Xb_X, Xb_Y)
-
-    # Create array with all case attribte data in binary format (as dummy variables)
-    case_attrib_bin_array = case_attrib_data_to_binary_array(SQLITE_DB, ALL_CASE_TBL, CASE_ATTRIB_DICT)
-
-    #TEST - COMPARE CASE ATTRIB BIN ARRAY AND INT MATRIX - make sure they align (for merging in function)
-    print case_attrib_bin_array.shape
-    print int_matrix.shape
-
-    #TEST MERGING FUNCTION OUTPUT
-    big_array = create_all_case_attribs_and_methods_binary_array(case_attrib_bin_array, int_matrix)
-    print "Big array: "
-    print big_array.shape
-    print big_array[:10,:20]
-    big_array_first_two_rows = big_array[:2,]  # get first two rows of big array only
-    big_array_first_two_rows_T = big_array_first_two_rows.T # flip vertically for easier viewing in output
-    print big_array_first_two_rows_T # CHECK THAT ALL ATTRIBS AND METHODS ARE CORRECTLY REP'D IN BIG ARRAY
-
-    #<--- LEFT OFF HERE 2/6 -- CHECK THAT ALL ATTRIBS AND METHODS ARE CORRECTLY REP'D IN BIG ARRAY!!  (once full database is avail)
+    
 
     #TEST - API DATA PULL
-    #api_test()
-    get_all_data_via_api(ROOT_API_URL, API_ALL_CASE_TBL_EXT, API_ALL_CASE_FLD, API_ALL_METHOD_TBL_EXT, API_ALL_METHOD_FLD, API_C2M_TBL_EXT, API_C2M_CASE_FLD, API_C2M_METHOD_FLD)
+    all_cases_api, all_methods_api, cases_to_methods_data_api = get_all_data_via_api(ROOT_API_URL, API_ALL_CASE_TBL_EXT, API_ALL_CASE_FLD, API_ALL_METHOD_TBL_EXT, API_ALL_METHOD_FLD, API_C2M_TBL_EXT, API_C2M_CASE_FLD, API_C2M_METHOD_FLD, ALL_ID_FLD)
+    #get_all_data_via_api_light(ROOT_API_URL, API_ALL_CASE_TBL_BY_ID_EXT, API_ALL_METHOD_TBL_BY_ID_EXT, API_C2M_TBL_EXT, API_C2M_CASE_FLD, API_C2M_METHOD_FLD)
 
-  
-
+    #TEST - TRY FUNCTIONS WITH API DATA
+    # Create interaction matrix (capturing cases-methods relationship table in binary matrix)(for subsequent us in collaborative filtering)
+    api_int_matrix = create_interaction_matrix(all_cases_api, all_methods_api, cases_to_methods_data_api, ALL_ID_FLD)
+    print "all_cases_api"
+    print all_cases_api
+    print
+    print "all_methods_api"
+    print all_methods_api
+    print
+    print "cases_to_methods_data_api"
+    print cases_to_methods_data_api
+    print api_int_matrix[2,:60]
+    
 
     
-    
-    
 
-'''
-Case id: 16  Method id: 53
-Case id: 1  Method id: 139
-Case id: 17  Method id: 354
-Case id: 9  Method id: 21
-Case id: 10  Method id: 49
-Case id: 11  Method id: 64
-Case id: 12  Method id: 64
-Case id: 12  Method id: 304
-Case id: 13  Method id: 52
-Case id: 13  Method id: 302
-Case id: 14  Method id: 179
-Case id: 15  Method id: 354
-Case id: 18  Method id: 7
-Case id: 75  Method id: 81
-Case id: 80  Method id: 217
-Case id: 81  Method id: 323
-Case id: 100  Method id: 323
-Case id: 100  Method id: 209
-Case id: 104  Method id: 390
-Case id: 105  Method id: 390
-Case id: 105  Method id: 217
-'''
+
+##############
+## BONEYARD ##
+##############
+    
+##Case id: 16  Method id: 53
+##Case id: 1  Method id: 139
+##Case id: 17  Method id: 354
+##Case id: 9  Method id: 21
+##Case id: 10  Method id: 49
+##Case id: 11  Method id: 64
+##Case id: 12  Method id: 64
+##Case id: 12  Method id: 304
+##Case id: 13  Method id: 52
+##Case id: 13  Method id: 302
+##Case id: 14  Method id: 179
+##Case id: 15  Method id: 354
+##Case id: 18  Method id: 7
+##Case id: 75  Method id: 81
+##Case id: 80  Method id: 217
+##Case id: 81  Method id: 323
+##Case id: 100  Method id: 323
+##Case id: 100  Method id: 209
+##Case id: 104  Method id: 390
+##Case id: 105  Method id: 390
+##Case id: 105  Method id: 217
+##'''
 
 ##    print "All cases: "
 ##    print all_cases
@@ -573,17 +614,6 @@ Case id: 105  Method id: 217
 ##    print cases_to_methods_data
 ##    print len(cases_and_methods_data)                         
 ##    print cases_and_methods_data[0][1]
-
-
-
-
-
-
-
-
-
-
-## BONEYARD ##
     
 ##    cases = [x[0] for x in cases_to_methods]
 ##    methods = [x[1] for x in cases_to_methods]
@@ -730,3 +760,150 @@ Case id: 105  Method id: 217
 ##    print interaction_matrix
 ##    print interaction_matrix[15][52]
 ##    print interaction_matrix[0][138]
+
+
+
+
+####    url = "https://www.googleapis.com/qpxExpress/v1/trips/search?key=mykeyhere"
+####    my_json_data = json.load(open("request.json"))
+####    req = request.post(url,data=my_json_data)
+####    print req.text
+####    print 
+####    print req.json # maybe? 
+##
+##    # Get and process data at each request url
+##    # case table
+##    print "Executing requests.get(case_tbl_url)..."
+##    data = requests.get(case_tbl_url)       # Get data object via api call
+##    print "data"
+##    print data
+##    print "type(data)"
+##    print type(data)
+##    
+##    #data_json = json.loads(data.text)
+##    data_json = data.json()                     # Get json representation of data object
+##    print "data_json[0]"
+##    print data_json[0]
+##    #data_json_py = json.loads(str(data_json))   # Convert json to python object
+##                                                # Convert python object to array
+##
+##    # TEST
+##    print "dat_json type:"
+##    print type(data_json)
+##    #print "data_json_py"
+##    #print data_json_py
+##    #print "type(data_json_py)"
+##    #print type(data_json_py)
+##    #print "data_json contents:"
+##    #print data_json
+##    print "json.dumps"
+##    print json.dumps(data_json)
+##
+####    import pycurl
+####    import pprint
+####
+####    c = pycurl.Curl()
+####    c.setopt(c.URL, case_tbl_url)
+####
+####    result = c.perform()
+####
+####    print result
+##                
+##
+####    my_data = json.loads(open("xyz.json").read())
+####
+####    print my_data
+
+
+
+### TEST - DELETE
+##def api_test():
+##    r = requests.get('https://api.github.com/events')
+##    r_json = r.json()
+##
+##    print "type(r_json)"
+##    print type(r_json)
+##    print "r_json"
+##    print r_json[:2]
+##    
+####    r_json_py = json.loads(str(r_json))
+####    print "type(r_json_py)"
+####    print type(r_json_py)
+####    print "r_json_py"
+####    print r_json_py[:2]
+
+
+##    case_tbl_data_clean_sorted = sorted(case_tbl_data_clean, key=lambda case: case[0])
+##    print "case_tbl_data_clean_sorted"
+##    print case_tbl_data_clean_sorted
+
+
+# Using 'requests' module
+# see http://docs.python-requests.org/en/latest/user/quickstart/
+
+# From Design Exchange Wiki
+
+# either send a get request with Accept: application/json header or send a get request to /path/file.json
+# all design methods: /design_methods
+# design methods by ID: /design_methods/id
+# all case studies: GET /case_studies
+# case studies by ID: /case_studies/id
+# Method case studies: /method_case_studies
+
+
+##def get_all_data_via_api_light(url, case_tbl_by_id_ext, method_tbl_by_id_ext, c2m_tbl_ext, c2m_case_fld, c2m_method_fld):
+##
+##    '''
+##
+##    CURRENTLY NOT WORKING
+##    
+##    input:  str, root DesEx url (url)
+##            ... 
+##            (str, name of target database table (method-case study relation) (tbl))
+##            (str, name of field with cases in target db (case_fld))
+##            (str, name of field with methods in target db (method_fld))
+##            ...
+##    output: three arrays:
+##                (1) all methods, w/ two cols: id, name
+##                (2) all cases, w/ two cols: id, name
+##                (3) case-to-methods, w/ two cols: case_id, method_id
+##
+##    dependencies: requests, json
+##
+##    NOTE: If it is necessary to pass in parameters to API call - that is, include params in url, use as template:
+##        payload = {'key1': 'value1', 'key2': 'value2'}
+##        r = requests.get("http://httpbin.org/get", params=payload)
+##
+##    '''
+##    # Construct request urls
+##    case_tbl_by_id_url = url + case_tbl_by_id_ext #+ ".json"
+##    method_tbl_by_id_url = url + method_tbl_by_id_ext #+ ".json"
+##    c2m_tbl_url = url + c2m_tbl_ext #+ ".json"
+##    
+##    # TEST
+##    print "case_tbl_by_id_url"
+##    print case_tbl_by_id_url
+##    print "method_tbl_by_id_url"
+##    print method_tbl_by_id_url
+##    print "c2m_tbl_url"
+##    print c2m_tbl_url
+##    print "getting data via API..."
+##
+##    # Get data via urls
+##    case_tbl_data = pd.io.json.read_json(case_tbl_by_id_url)
+##    method_tbl_data = pd.io.json.read_json(method_tbl_by_id_url)
+##    c2m_tbl_data = pd.io.json.read_json(c2m_tbl_url)
+##
+##    # Convert rec'd json data to numpy arrays, removing all but columns to keep   
+##    case_tbl_data_clean = case_tbl_dat.as_matrix(columns = None)
+##    method_tbl_data_clean = method_tbl_data.as_matrix(columns = None)
+##    c2m_tbl_data_clean = c2m_tbl_data.as_matrix(columns = None)
+##
+##    print "case_tbl_data_clean[:5,]"
+##    print case_tbl_data_clean[:5,]
+##    print "method_tbl_data_clean[:5,]"
+##    print method_tbl_data_clean[:5,]
+##    print "c2m_tbl_data_clean[:5,]"
+##    print c2m_tbl_data_clean[:5,]
+##    
+##    #return case_tlb_data_clean, method_tbl_data_clean, c2m_tbl_data_clean
